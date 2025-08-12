@@ -140,9 +140,26 @@ text
 d ≡ (s1 - s2) * [(r2 - r1 - s1 + s2)^-1] mod n
 
 # 实验结果
-<img width="1588" height="469" alt="image" src="https://github.com/user-attachments/assets/171935af-b62c-49f9-92b8-bcf0da110426" />
+<img width="1489" height="510" alt="image" src="https://github.com/user-attachments/assets/6b1b88c6-1ebc-481f-b31f-6e23d53d95f5" />
 
 # 伪造中本聪的数字签名
+## . 伪造方法分析
+### (1) 随机数（k）重用攻击
+ECDSA 签名公式：
+
+r = (k × G).x mod N
+
+s = (H(m) + r × d) × k⁻¹ mod N
+
+如果同一个 k 被用于两个不同的签名，攻击者可以解方程求出私钥 d：
+
+已知两个签名 (r, s1) 和 (r, s2)，对应消息 m1 和 m2：
+
+s1 = (H(m1) + r × d) × k⁻¹ mod N
+
+s2 = (H(m2) + r × d) × k⁻¹ mod N
+
+联立方程解出 d。但实际不可行：
 <img width="1348" height="364" alt="image" src="https://github.com/user-attachments/assets/af5f001f-3169-4eae-8d9d-42bdc722fb92" />
 
 
