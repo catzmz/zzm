@@ -139,12 +139,6 @@ snarkjs groth16 prove poseidon2_test_final.zkey witness.wtns proof.json public.j
 
 # 验证证明
 snarkjs groth16 verify verification_key.json public.json proof.json
-input.json示例：
+
 ```
 
-## json
-```
-{
-  "hash": "123456789",        // 公开poseidon哈希值（根据输入算出）
-  "preimage": ["1", "2", "3"] // 私密输入
-}
