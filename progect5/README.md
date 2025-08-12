@@ -93,7 +93,14 @@
 # sm2实现结果
 <img width="1544" height="274" alt="image" src="https://github.com/user-attachments/assets/8db9381b-70f4-442b-b448-925c48d893f2" />
 <img width="632" height="255" alt="image" src="https://github.com/user-attachments/assets/dd0aca8a-dfae-4ea2-b2df-b3c1654f0f7e" />
+
+
+
+
+
 # 基于做poc验证
+
+
 ## 推导文档
 
 给定两条使用相同k的签名：
@@ -133,4 +140,8 @@ text
 d ≡ (s1 - s2) * [(r2 - r1 - s1 + s2)^-1] mod n
 
 # 实验结果
+<img width="1588" height="469" alt="image" src="https://github.com/user-attachments/assets/171935af-b62c-49f9-92b8-bcf0da110426" />
+
+# 伪造中本聪的数字签名
+
 
