@@ -85,7 +85,8 @@ def verify_proof(leaf_hash, proof, root_hash):
 
 ### 2. Length-Extension Attack 
 
-<img width="974" height="314" alt="image" src="https://github.com/user-attachments/assets/7d13e51a-6982-4063-bd7d-e1eafc685f4e" />
+
+<img width="1483" height="762" alt="image" src="https://github.com/user-attachments/assets/4ad545e5-8a6a-4018-8c05-c83f0caa8f50" />
 
 
 ### 3. Merkle 树运行结果
