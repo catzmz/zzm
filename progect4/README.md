@@ -80,7 +80,7 @@ def verify_proof(leaf_hash, proof, root_hash):
 ## 实验结果
 
 ### 1. SM3 基本版本运行结果
-![SM3 基本版运行结果](pic/SM3_res.png)
+<img width="965" height="577" alt="image" src="https://github.com/user-attachments/assets/eff9f0d2-9a12-4700-82b6-7539072ae324" />
 
 ### 2. SIMD 优化版本运行结果
 ![SM3 SIMD 优化运行结果](pic/SM3_SIMD.png)
