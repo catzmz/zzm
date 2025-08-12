@@ -1,72 +1,82 @@
-# PROJECT4:  SM3的软件实现与优化
+# 1. SM3 基本实现与性能优化
+## 基础原理
+SM3 是一种国产密码哈希算法，采用 Merkle–Damgård 结构，处理 512-bit 消息块，输出 256-bit 哈希值。核心步骤包括：
 
-## 实验要求
-1. 基于 **SM3** 的基本软件实现（参考 Project 1 与付勇老师 PPT），逐步优化其执行效率。  
-2. 在 SM3 的实现基础上，验证 **Length-Extension Attack（长度扩展攻击）**。  
-3. 按照 **RFC6962** 构建包含 100,000 个叶子节点的 **Merkle 树**，并生成叶子节点的 **存在性证明**与**不存在性证明**。
+填充：按规则补足消息长度（追加 0x80、0x00、64-bit 消息长度）。
 
----
+迭代压缩：对每个块调用压缩函数，更新 8 个 32-bit 中间状态（V0-V7），最终拼接为哈希值。
 
-## 实验过程
+## 优化方向
 
-### 1. SM3 基本实现与性能优化
-- 使用 `SM3.cpp` 编写 SM3 哈希算法的基础版本，并验证其功能正确性。
-- 参考付勇老师 PPT，利用 **SIMD/AVX2** 技术优化，在 `SM3_SIMD.cpp` 中实现高效版本。
+SIMD/AVX2：利用单指令多数据（SIMD）并行处理多个消息块或压缩步骤，例如同时计算多个消息块的布尔函数或循环移位。
 
----
+预计算常量：将算法中的固定常量（如 T_j）预先存储，减少运行时计算。
 
-### 2. Length-Extension Attack 实现
+循环展开：手动展开压缩函数的循环，减少分支预测开销。
 
-#### 攻击原理
-SM3 采用 **Merkle–Damgård** 构造，处理块大小为 512 bit，每次压缩输出 256 bit。由于其内部状态与哈希输出等价，攻击者可利用已知哈希值和消息长度构造伪造数据，而无需知道原始消息明文或密钥。
+# 2. 长度扩展攻击（Length-Extension Attack）
+## 攻击原理
+SM3 的 Merkle–Damgård 结构 导致内部状态等价于哈希输出。攻击者已知 H(key || msg) 和 msg 的长度时：
 
-填充规则：
-1. 在消息末尾追加单字节 `0x80`。
-2. 追加若干字节 `0x00` 直到消息长度（含 64 位长度域）是 512 bit 的整数倍。
-3. 追加原始消息的比特长度（64 位，大端）。
+构造填充：在 msg 后补 0x80、0x00 和长度字段，形成合法填充块 padding。
 
-#### 攻击流程
-1. 计算合法消息 `key || msg` 的哈希值 `H`（服务器端）。
-2. 攻击者已知 `H` 和消息长度 `L`，构造标准填充，并将 `H` 作为初始内部状态。
-3. 压缩扩展数据 `extension`，生成伪造哈希 `H'`。
-4. 服务器对 `key || msg || padding || extension` 计算哈希 `legitimate_hash`。
-5. 若 `H' == legitimate_hash`，则攻击成功。
+扩展数据：将 H(key || msg) 作为初始状态，继续压缩新数据 extension，得到伪造哈希 H'。
 
-#### 代码验证
-在 `SM3_attack.cpp` 中输出：
-- 原始哈希
-- 伪造哈希
-- 合法哈希
-并打印攻击结果。
+验证攻击：服务器计算 H(key || msg || padding || extension) 会与 H' 匹配，因为两者共享相同的初始状态。
 
----
+## 关键点
 
-### 3. Merkle 树构建与证明
+攻击者无需知道 key，仅需哈希值和原始消息长度。
 
-#### 构建方法
-- **叶子哈希**：`leaf_hash = SM3(0x00 || data)`（前缀 `0x00` 区分叶子节点）。
-- **内部节点哈希**：`node_hash = SM3(0x01 || left_hash || right_hash)`（前缀 `0x01` 区分内部节点）。
-- 若当前层节点数为奇数，则复制最后一个节点以保持偶数。
-- 树高约为 `ceil(log2(N))`，当 `N=100,000` 时约 17 层。
-- 每层批量计算哈希以提高构建速度。
+填充规则必须严格遵循（如大端长度编码）。
 
-#### 存在性证明
-- 证明路径包含从叶子到根的兄弟节点哈希及左右位置标记。
-- 验证时从 `leaf_hash` 出发，按路径依次计算父节点哈希，直至根节点，与存储的根哈希比对。
-- 路径长度约等于树高，证明大小约为 `树高 × 32 bytes`。
+# 3. Merkle 树构建与证明
+## 构建规则（RFC6962）
 
-#### 不存在性证明
-- 在有序叶子列表中定位目标数据的插入位置。
-- 生成该位置相邻叶子的存在性证明，间接证明目标数据不存在。
+叶子节点：leaf_hash = SM3(0x00 || data)（前缀 0x00 标识叶子）。
 
-#### 代码验证
-在 `SM3_MT.cpp` 中输出：
-- 根哈希
-- 存在性证明验证结果
-- 不存在性证明验证结果
+内部节点：node_hash = SM3(0x01 || left_hash || right_hash)（前缀 0x01 标识内部节点）。
 
----
+平衡处理：若节点数为奇数，复制最后一个节点保证完全二叉树结构。
 
+## 存在性证明
+
+路径构造：从目标叶子到根路径上的所有兄弟节点哈希及方向（左/右）。
+
+验证：逐层计算父节点哈希，最终与根哈希比对。
+
+## 不存在性证明
+
+有序性：假设叶子按字典序排列，找到目标数据相邻的两个叶子。
+
+证明：提供这两个叶子的存在性证明，并验证目标数据不在两者之间。
+
+# 关键代码逻辑
+```python
+def length_extension_attack(original_hash, original_length, extension):
+    # 构造填充
+    padding = b'\x80' + b'\x00' * ((56 - (original_length + 1) % 64) % 64)
+    padding += (original_length * 8).to_bytes(8, 'big')  # 64-bit 长度
+    
+    # 将 original_hash 作为初始状态，继续处理 extension
+    forged_hash = SM3(extension, initial_state=original_hash)
+    
+    # 服务器计算的合法哈希
+    legitimate_hash = SM3(key + msg + padding + extension)
+    
+    return forged_hash == legitimate_hash
+```
+## Merkle 树存在性验证
+```python
+def verify_proof(leaf_hash, proof, root_hash):
+    current_hash = leaf_hash
+    for sibling_hash, direction in proof:
+        if direction == 'left':
+            current_hash = SM3(0x01 + sibling_hash + current_hash)
+        else:
+            current_hash = SM3(0x01 + current_hash + sibling_hash)
+    return current_hash == root_hash
+```
 ## 实验结果
 
 ### 1. SM3 基本版本运行结果
