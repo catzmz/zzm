@@ -89,5 +89,7 @@ def verify_proof(leaf_hash, proof, root_hash):
 ![Length-Extension Attack 运行结果](pic/SM3_attack.png)
 
 ### 4. Merkle 树运行结果
-![Merkle Tree 运行结果](pic/SM3_MT.png)
+
+<img width="995" height="570" alt="image" src="https://github.com/user-attachments/assets/3c7645a8-8cfb-4912-9ea9-6541e656864b" />
+
 
