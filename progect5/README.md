@@ -91,8 +91,8 @@
 验证 R = (e + x1) mod n 是否等于 r
 
 # sm2实现结果
-<img width="1544" height="274" alt="image" src="https://github.com/user-attachments/assets/8db9381b-70f4-442b-b448-925c48d893f2" />
-<img width="632" height="255" alt="image" src="https://github.com/user-attachments/assets/dd0aca8a-dfae-4ea2-b2df-b3c1654f0f7e" />
+<img width="1278" height="135" alt="image" src="https://github.com/user-attachments/assets/50de86eb-0b1b-4131-86e8-7f6d97f4efc5" />
+
 
 
 
@@ -143,5 +143,6 @@ d ≡ (s1 - s2) * [(r2 - r1 - s1 + s2)^-1] mod n
 <img width="1588" height="469" alt="image" src="https://github.com/user-attachments/assets/171935af-b62c-49f9-92b8-bcf0da110426" />
 
 # 伪造中本聪的数字签名
+<img width="1348" height="364" alt="image" src="https://github.com/user-attachments/assets/af5f001f-3169-4eae-8d9d-42bdc722fb92" />
 
 
