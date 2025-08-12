@@ -44,9 +44,6 @@ X[i + 4] = X[i] ^ sm4_t_table(tmp);
 # 结果
 <img width="1077" height="236" alt="image" src="https://github.com/user-attachments/assets/85c5280d-8b6d-4e7b-8061-e16a85b421a9" />
 
-<img width="1077" height="236" alt="image" src="https://github.com/user-attachments/assets/fc3a315e-9a32-45b8-994b-34af3683829d" />
-
-
 
 
 
