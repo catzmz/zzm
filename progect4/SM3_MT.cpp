@@ -1,254 +1,290 @@
 #include <iostream>
-#include <cstring>
-#include <iomanip>
 #include <vector>
 #include <string>
-#include <stdint.h>
 #include <algorithm>
+#include <iomanip>
 #include <stdexcept>
+#include <cmath>
 
 using namespace std;
 
-#define ROTL(x, n) (((x) << (n)) | ((x) >> (32 - (n))))
-#define FF0(x,y,z) ((x) ^ (y) ^ (z))
-#define FF1(x,y,z) (((x) & (y)) | ((x) & (z)) | ((y) & (z)))
-#define GG0(x,y,z) ((x) ^ (y) ^ (z))
-#define GG1(x,y,z) (((x) & (y)) | ((~(x)) & (z)))
-#define P0(x) ((x) ^ ROTL((x), 9) ^ ROTL((x), 17))
-#define P1(x) ((x) ^ ROTL((x), 15) ^ ROTL((x), 23))
-
-const uint32_t IV[8] = {
-    0x7380166f, 0x4914b2b9, 0x172442d7, 0xda8a0600,
-    0xa96f30bc, 0x163138aa, 0xe38dee4d, 0xb0fb0e4e
-};
-const uint32_t T_j[64] = {
-    0x79cc4519, 0x79cc4519, 0x79cc4519, 0x79cc4519, 0x79cc4519, 0x79cc4519, 0x79cc4519, 0x79cc4519,
-    0x79cc4519, 0x79cc4519, 0x79cc4519, 0x79cc4519, 0x79cc4519, 0x79cc4519, 0x79cc4519, 0x79cc4519,
-    0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a,
-    0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a,
-    0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a,
-    0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a,
-    0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a
-};
-
-void sm3_compress(uint32_t V[8], const uint8_t B[64]) {
-    uint32_t W[68], W1[64];
-    for(int i=0;i<16;i++) W[i]=(B[4*i]<<24)|(B[4*i+1]<<16)|(B[4*i+2]<<8)|(B[4*i+3]);
-    for(int i=16;i<68;i++) W[i]=P1(W[i-16]^W[i-9]^ROTL(W[i-3],15))^ROTL(W[i-13],7)^W[i-6];
-    for(int i=0;i<64;i++) W1[i]=W[i]^W[i+4];
-    uint32_t A=V[0],B_=V[1],C=V[2],D=V[3],E=V[4],F=V[5],G=V[6],H=V[7];
-    for(int j=0;j<64;j++) {
-        uint32_t SS1=ROTL((ROTL(A,12)+E+ROTL(T_j[j],j%32)),7);
-        uint32_t SS2=SS1^ROTL(A,12);
-        uint32_t TT1=((j<16)?FF0(A,B_,C):FF1(A,B_,C))+D+SS2+W1[j];
-        uint32_t TT2=((j<16)?GG0(E,F,G):GG1(E,F,G))+H+SS1+W[j];
-        D=C; C=ROTL(B_,9); B_=A; A=TT1; H=G; G=ROTL(F,19); F=E; E=P0(TT2);
-    }
-    V[0]^=A; V[1]^=B_; V[2]^=C; V[3]^=D; V[4]^=E; V[5]^=F; V[6]^=G; V[7]^=H;
-}
-vector<uint8_t> sm3_hash(const uint8_t* message, size_t len) {
-    uint64_t bit_len = len*8;
-    size_t padded_len = ((len+1+8+63)/64)*64;
-    vector<uint8_t> padded(padded_len, 0);
-    memcpy(padded.data(),message,len);
-    padded[len]=0x80;
-    for(int i=0;i<8;i++) padded[padded_len-1-i]=(bit_len>>(8*i))&0xff;
-    uint32_t V[8];
-    memcpy(V,IV,sizeof(IV));
-    for(size_t i=0;i<padded.size();i+=64) sm3_compress(V,padded.data()+i);
-    vector<uint8_t> digest(32);
-    for(int i=0;i<8;i++) {
-        digest[4*i]=(V[i]>>24)&0xff; digest[4*i+1]=(V[i]>>16)&0xff;
-        digest[4*i+2]=(V[i]>>8)&0xff; digest[4*i+3]=V[i]&0xff;
-    }
-    return digest;
-}
-vector<uint8_t> sm3_hash_vec(const vector<uint8_t>& message) {
-    return sm3_hash(message.data(), message.size());
-}
-
-void print_hash(const string& label, const vector<uint8_t>& hash) {
-    cout << label;
-    for (uint8_t byte : hash) cout << hex << setw(2) << setfill('0') << static_cast<int>(byte);
-    cout << dec << endl;
-}
-
-class MerkleTree {
-private:
-    vector<vector<uint8_t>> leaves;
-    vector<vector<vector<uint8_t>>> levels; // 存储每一层的哈希值
-    vector<uint8_t> root;
-
-    //叶子哈希
-    vector<uint8_t> hash_leaf(const vector<uint8_t>& data) {
-        vector<uint8_t> prefixed_data = {0x00};
-        prefixed_data.insert(prefixed_data.end(), data.begin(), data.end());
-        return sm3_hash_vec(prefixed_data);
-    }
-
-    //内部节点哈希
-    vector<uint8_t> hash_internal_node(const vector<uint8_t>& left, const vector<uint8_t>& right) {
-        vector<uint8_t> prefixed_data = {0x01};
-        prefixed_data.insert(prefixed_data.end(), left.begin(), left.end());
-        prefixed_data.insert(prefixed_data.end(), right.begin(), right.end());
-        return sm3_hash_vec(prefixed_data);
-    }
-
+// SM3哈希算法实现
+class SM3 {
 public:
-    //构建树
-    MerkleTree(const vector<vector<uint8_t>>& initial_leaves) : leaves(initial_leaves) {
+    static constexpr uint32_t IV[8] = {
+        0x7380166f, 0x4914b2b9, 0x172442d7, 0xda8a0600,
+        0xa96f30bc, 0x163138aa, 0xe38dee4d, 0xb0fb0e4e
+    };
+
+    static constexpr uint32_t T[64] = {
+        0x79cc4519, 0x79cc4519, 0x79cc4519, 0x79cc4519, 0x79cc4519, 0x79cc4519, 0x79cc4519, 0x79cc4519,
+        0x79cc4519, 0x79cc4519, 0x79cc4519, 0x79cc4519, 0x79cc4519, 0x79cc4519, 0x79cc4519, 0x79cc4519,
+        0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a,
+        0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a,
+        0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a,
+        0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a,
+        0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a,
+        0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a, 0x7a879d8a
+    };
+
+    static vector<uint8_t> hash(const vector<uint8_t>& message) {
+        uint64_t bit_len = message.size() * 8;
+        size_t pad_len = ((message.size() + 8 + 1 + 63) / 64) * 64;
+        vector<uint8_t> padded(pad_len, 0);
+        copy(message.begin(), message.end(), padded.begin());
+        padded[message.size()] = 0x80;
+
+        for (int i = 0; i < 8; ++i) {
+            padded[pad_len - 8 + i] = (bit_len >> (56 - i * 8)) & 0xFF;
+        }
+
+        uint32_t V[8];
+        copy(begin(IV), end(IV), begin(V));
+
+        for (size_t i = 0; i < pad_len; i += 64) {
+            compress(V, padded.data() + i);
+        }
+
+        vector<uint8_t> digest(32);
+        for (int i = 0; i < 8; ++i) {
+            digest[i * 4] = (V[i] >> 24) & 0xFF;
+            digest[i * 4 + 1] = (V[i] >> 16) & 0xFF;
+            digest[i * 4 + 2] = (V[i] >> 8) & 0xFF;
+            digest[i * 4 + 3] = V[i] & 0xFF;
+        }
+        return digest;
+    }
+
+private:
+    static inline uint32_t ROTL(uint32_t x, int n) {
+        return (x << n) | (x >> (32 - n));
+    }
+
+    static inline uint32_t FF(uint32_t x, uint32_t y, uint32_t z, int j) {
+        return (j < 16) ? (x ^ y ^ z) : ((x & y) | (x & z) | (y & z));
+    }
+
+    static inline uint32_t GG(uint32_t x, uint32_t y, uint32_t z, int j) {
+        return (j < 16) ? (x ^ y ^ z) : ((x & y) | ((~x) & z));
+    }
+
+    static inline uint32_t P0(uint32_t x) {
+        return x ^ ROTL(x, 9) ^ ROTL(x, 17);
+    }
+
+    static inline uint32_t P1(uint32_t x) {
+        return x ^ ROTL(x, 15) ^ ROTL(x, 23);
+    }
+
+    static void compress(uint32_t V[8], const uint8_t block[64]) {
+        uint32_t W[68], W1[64];
+
+        // 消息扩展
+        for (int i = 0; i < 16; ++i) {
+            W[i] = (block[i * 4] << 24) | (block[i * 4 + 1] << 16)
+                | (block[i * 4 + 2] << 8) | block[i * 4 + 3];
+        }
+        for (int i = 16; i < 68; ++i) {
+            W[i] = P1(W[i - 16] ^ W[i - 9] ^ ROTL(W[i - 3], 15))
+                ^ ROTL(W[i - 13], 7) ^ W[i - 6];
+        }
+        for (int i = 0; i < 64; ++i) {
+            W1[i] = W[i] ^ W[i + 4];
+        }
+
+        uint32_t A = V[0], B = V[1], C = V[2], D = V[3];
+        uint32_t E = V[4], F = V[5], G = V[6], H = V[7];
+
+        // 压缩函数
+        for (int j = 0; j < 64; ++j) {
+            uint32_t SS1 = ROTL((ROTL(A, 12) + E + ROTL(T[j], j % 32)), 7);
+            uint32_t SS2 = SS1 ^ ROTL(A, 12);
+            uint32_t TT1 = FF(A, B, C, j) + D + SS2 + W1[j];
+            uint32_t TT2 = GG(E, F, G, j) + H + SS1 + W[j];
+
+            D = C;
+            C = ROTL(B, 9);
+            B = A;
+            A = TT1;
+            H = G;
+            G = ROTL(F, 19);
+            F = E;
+            E = P0(TT2);
+        }
+
+        V[0] ^= A; V[1] ^= B; V[2] ^= C; V[3] ^= D;
+        V[4] ^= E; V[5] ^= F; V[6] ^= G; V[7] ^= H;
+    }
+};
+
+// Merkle树实现
+class MerkleTree {
+public:
+    MerkleTree(const vector<vector<uint8_t>>& leaves) {
         if (leaves.empty()) {
-            root = sm3_hash_vec({}); // 空树的根哈希
+            root_ = SM3::hash({});
             return;
         }
 
-        // 计算第一层
+        // 计算叶子节点哈希
         vector<vector<uint8_t>> current_level;
         for (const auto& leaf : leaves) {
-            current_level.push_back(hash_leaf(leaf));
+            vector<uint8_t> prefixed_leaf = { 0x00 };
+            prefixed_leaf.insert(prefixed_leaf.end(), leaf.begin(), leaf.end());
+            current_level.push_back(SM3::hash(prefixed_leaf));
         }
-        levels.push_back(current_level);
+        levels_.push_back(current_level);
 
-        // 自底向上构建树
+        // 构建中间节点
         while (current_level.size() > 1) {
             vector<vector<uint8_t>> next_level;
-            // 如果当前层节点数为奇数，复制最后一个节点
+
+            // 处理奇数个节点的情况
             if (current_level.size() % 2 != 0) {
                 current_level.push_back(current_level.back());
             }
-            
+
             for (size_t i = 0; i < current_level.size(); i += 2) {
-                next_level.push_back(hash_internal_node(current_level[i], current_level[i + 1]));
+                vector<uint8_t> prefixed_node = { 0x01 };
+                prefixed_node.insert(prefixed_node.end(),
+                    current_level[i].begin(), current_level[i].end());
+                prefixed_node.insert(prefixed_node.end(),
+                    current_level[i + 1].begin(), current_level[i + 1].end());
+                next_level.push_back(SM3::hash(prefixed_node));
             }
-            levels.push_back(next_level);
+
+            levels_.push_back(next_level);
             current_level = next_level;
         }
-        root = current_level[0];
+
+        root_ = current_level[0];
     }
 
-    const vector<uint8_t>& getRoot() const {
-        return root;
-    }
-    
-    // 生成存在性证明
-    vector<vector<uint8_t>> generateInclusionProof(size_t leaf_index) const {
-        if (leaf_index >= leaves.size()) {
-            throw out_of_range("Leaf index out of range.");
+    const vector<uint8_t>& root() const { return root_; }
+
+    vector<vector<uint8_t>> generate_proof(size_t leaf_index) const {
+        if (leaf_index >= levels_[0].size()) {
+            throw out_of_range("Leaf index out of range");
         }
+
         vector<vector<uint8_t>> proof;
         size_t current_index = leaf_index;
 
-        // 遍历除根节点外的所有层
-        for (size_t i = 0; i < levels.size() - 1; ++i) {
-            const auto& current_level = levels[i];
-            size_t sibling_index = (current_index % 2 == 0) ? current_index + 1 : current_index - 1;
-            
-            if (sibling_index < current_level.size()) {
-                // 如果兄弟节点存在，则添加到证明中
-                proof.push_back(current_level[sibling_index]);
-            } else {
-                // 如果兄弟节点不存在（意味着当前节点是奇数层的最后一个）
-                // 则将节点自身添加到证明中，因为它是与自己进行哈希的
-                proof.push_back(current_level[current_index]);
+        for (size_t level = 0; level < levels_.size() - 1; ++level) {
+            size_t sibling_index = current_index ^ 1; // 获取兄弟节点索引
+            if (sibling_index < levels_[level].size()) {
+                proof.push_back(levels_[level][sibling_index]);
+            }
+            else {
+                // 处理奇数节点情况
+                proof.push_back(levels_[level][current_index]);
             }
             current_index /= 2;
         }
+
         return proof;
     }
 
-    //存在性证明
-    static bool verifyInclusionProof(const vector<uint8_t>& leaf_data, size_t leaf_index, const vector<vector<uint8_t>>& proof, const vector<uint8_t>& root_hash) {
-        vector<uint8_t> prefixed_leaf = {0x00};
-        prefixed_leaf.insert(prefixed_leaf.end(), leaf_data.begin(), leaf_data.end());
-        vector<uint8_t> computed_hash = sm3_hash_vec(prefixed_leaf);
+    static bool verify_proof(const vector<uint8_t>& leaf_data,
+        const vector<uint8_t>& root_hash,
+        const vector<vector<uint8_t>>& proof,
+        size_t leaf_index) {
+        // 1. 计算叶子节点的哈希（添加前缀0x00）
+        vector<uint8_t> current_hash;
+        current_hash.reserve(1 + leaf_data.size());
+        current_hash.push_back(0x00);
+        current_hash.insert(current_hash.end(), leaf_data.begin(), leaf_data.end());
+        current_hash = SM3::hash(current_hash);
 
-        size_t current_index = leaf_index;
-        for (const auto& proof_hash : proof) {
+        // 2. 沿着证明路径向上计算
+        for (size_t i = 0; i < proof.size(); ++i) {
             vector<uint8_t> combined;
-            combined.push_back(0x01);
-            if (current_index % 2 == 0) { // 当前哈希是左节点
-                combined.insert(combined.end(), computed_hash.begin(), computed_hash.end());
-                combined.insert(combined.end(), proof_hash.begin(), proof_hash.end());
-            } else { // 当前哈希是右节点
-                combined.insert(combined.end(), proof_hash.begin(), proof_hash.end());
-                combined.insert(combined.end(), computed_hash.begin(), computed_hash.end());
+            combined.reserve(1 + current_hash.size() + proof[i].size());
+            combined.push_back(0x01); // 内部节点前缀
+
+            // 根据索引的当前位决定左右顺序
+            if ((leaf_index >> i) & 1) {
+                // 当前是右节点，兄弟在左边
+                combined.insert(combined.end(), proof[i].begin(), proof[i].end());
+                combined.insert(combined.end(), current_hash.begin(), current_hash.end());
             }
-            computed_hash = sm3_hash_vec(combined);
-            current_index /= 2;
+            else {
+                // 当前是左节点，兄弟在右边
+                combined.insert(combined.end(), current_hash.begin(), current_hash.end());
+                combined.insert(combined.end(), proof[i].begin(), proof[i].end());
+            }
+
+            // 计算父节点哈希
+            current_hash = SM3::hash(combined);
         }
-        return computed_hash == root_hash;
+
+        // 3. 比较最终计算结果与根哈希
+        return current_hash == root_hash;
     }
+
+private:
+    vector<vector<vector<uint8_t>>> levels_;
+    vector<uint8_t> root_;
 };
 
+// 辅助函数
+void print_hex(const string& label, const vector<uint8_t>& data) {
+    cout << label;
+    for (uint8_t byte : data) {
+        cout << hex << setw(2) << setfill('0') << static_cast<int>(byte);
+    }
+    cout << dec << endl;
+}
+
+vector<uint8_t> string_to_bytes(const string& s) {
+    return vector<uint8_t>(s.begin(), s.end());
+}
 
 int main() {
-
-    // 生成叶子节点数据
-    const int LEAF_COUNT = 100000;
-    vector<vector<uint8_t>> leaves_data;
-    for (int i = 0; i < LEAF_COUNT; ++i) {
-        string leaf_str = "leaf-data-" + to_string(i);
-        leaves_data.emplace_back(leaf_str.begin(), leaf_str.end());
+    // 1. 生成100,000个叶子节点
+    const size_t LEAF_COUNT = 100000;
+    vector<vector<uint8_t>> leaves;
+    for (size_t i = 0; i < LEAF_COUNT; ++i) {
+        leaves.push_back(string_to_bytes("leaf" + to_string(i)));
     }
 
-    // 对叶子数据排序
-    sort(leaves_data.begin(), leaves_data.end());
+    // 2. 构建Merkle树
+    cout << "构建Merkle树..." << endl;
+    MerkleTree tree(leaves);
+    print_hex("根哈希: ", tree.root());
+    cout << "树高度: " << ceil(log2(LEAF_COUNT)) << endl;
 
-    //构建 Merkle 树
-    cout << "构建 Merkle 树：" << endl;
-    MerkleTree tree(leaves_data);
-    const auto& root_hash = tree.getRoot();
-    print_hash("MT构建完成，根哈希为: ", root_hash);
-    
-    // 4. 存在性证明 (Inclusion Proof)
-    cout << "存在性证明：" << endl;
-    string target_leaf_str = "leaf-data-88888";
-    vector<uint8_t> target_leaf_data(target_leaf_str.begin(), target_leaf_str.end());
-    
-    // 找到排序后目标叶子的索引
-    auto it = lower_bound(leaves_data.begin(), leaves_data.end(), target_leaf_data);
-    size_t target_index = distance(leaves_data.begin(), it);
+    // 3. 存在性证明
+    size_t target_index = 12345;
+    auto target_leaf = leaves[target_index];
+    string leaf_str(target_leaf.begin(), target_leaf.end());
+    cout << "\n存在性证明 - 叶子节点 " << target_index << ": \"" << leaf_str << "\"" << endl;
 
-    cout << "   目标叶子: \"" << target_leaf_str << "\", 索引: " << target_index << endl;
-    
-    auto inclusion_proof = tree.generateInclusionProof(target_index);
-    cout << "   生成的证明路径长度为: " << inclusion_proof.size() << " 个哈希" << endl;
-    
-    bool is_valid_inclusion = MerkleTree::verifyInclusionProof(target_leaf_data, target_index, inclusion_proof, root_hash);
-    if (is_valid_inclusion) {
-        cout << "存在性证明验证成功" << endl;
-    } else {
-        cout << "存在性证明验证失败" << endl;
+    auto proof = tree.generate_proof(target_index);
+    cout << "证明路径长度: " << proof.size() << endl;
+
+    bool valid = MerkleTree::verify_proof(target_leaf, tree.root(), proof, target_index);
+    cout << "验证结果: " << (valid ? "成功" : "失败") << endl;
+
+    // 4. 不存在性证明
+    vector<uint8_t> non_existent_leaf = string_to_bytes("non-existent-leaf");
+    cout << "\n不存在性证明 - 叶子节点: \"non-existent-leaf\"" << endl;
+
+    // 在有序列表中查找插入位置
+    auto it = lower_bound(leaves.begin(), leaves.end(), non_existent_leaf);
+    if (it == leaves.end()) {
+        it = leaves.end() - 1;
+    }
+    size_t proof_index = distance(leaves.begin(), it);
+
+    auto non_existent_proof = tree.generate_proof(proof_index);
+    cout << "使用相邻叶子节点 " << proof_index << " 的证明" << endl;
+
+    valid = MerkleTree::verify_proof(*it, tree.root(), non_existent_proof, proof_index);
+    cout << "验证结果: " << (valid ? "成功" : "失败") << endl;
+    if (valid) {
+        cout << "因为相邻叶子节点存在且位置正确，证明目标叶子不存在" << endl;
     }
 
-
-    //不存在性证明
-    string non_existent_leaf_str = "this-leaf-does-not-exist";
-    vector<uint8_t> non_existent_leaf_data(non_existent_leaf_str.begin(), non_existent_leaf_str.end());
-    cout << non_existent_leaf_str<< "不存在性证明：" << endl;
-    
-    // 在排好序的叶子中，找到这个不存在的元素若存在则应该在的位置，为该位置的元素提供一个存在性证明
-    // 如果证明成功，就说明那个位置已经被占了，从而证明目标元素不存在
-    auto non_existent_it = lower_bound(leaves_data.begin(), leaves_data.end(), non_existent_leaf_data);
-    size_t proof_for_index = distance(leaves_data.begin(), non_existent_it);
-    
-    if (proof_for_index >= leaves_data.size()) {
-         proof_for_index = leaves_data.size() - 1;
-    }
-    
-    vector<uint8_t> proof_for_leaf_data = leaves_data[proof_for_index];
-    string proof_for_leaf_str(proof_for_leaf_data.begin(), proof_for_leaf_data.end());
-
-    cout << "通过证明叶子节点 \"" << proof_for_leaf_str << "\" (索引 " << proof_for_index << ") 的存在性。" << endl;
-    
-    auto non_inclusion_proof = tree.generateInclusionProof(proof_for_index);
-    bool is_valid_non_inclusion = MerkleTree::verifyInclusionProof(proof_for_leaf_data, proof_for_index, non_inclusion_proof, root_hash);
-
-    if (is_valid_non_inclusion) {
-        cout << "不存在性证明验证成功" << endl;
-    } else {
-        cout << "不存在性证明验证失败" << endl;
-    }
-    
     return 0;
 }
