@@ -79,16 +79,14 @@ def verify_proof(leaf_hash, proof, root_hash):
 ```
 ## 实验结果
 
-### 1. SM3 基本版本运行结果
+### 1. SM3 优化
 <img width="965" height="577" alt="image" src="https://github.com/user-attachments/assets/eff9f0d2-9a12-4700-82b6-7539072ae324" />
 
-### 2. SIMD 优化版本运行结果
-![SM3 SIMD 优化运行结果](pic/SM3_SIMD.png)
 
-### 3. Length-Extension Attack 运行结果
+### 2. Length-Extension Attack 
 ![Length-Extension Attack 运行结果](pic/SM3_attack.png)
 
-### 4. Merkle 树运行结果
+### 3. Merkle 树运行结果
 
 <img width="995" height="570" alt="image" src="https://github.com/user-attachments/assets/3c7645a8-8cfb-4912-9ea9-6541e656864b" />
 
