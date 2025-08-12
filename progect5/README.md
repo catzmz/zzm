@@ -93,6 +93,44 @@
 # sm2实现结果
 <img width="1544" height="274" alt="image" src="https://github.com/user-attachments/assets/8db9381b-70f4-442b-b448-925c48d893f2" />
 <img width="632" height="255" alt="image" src="https://github.com/user-attachments/assets/dd0aca8a-dfae-4ea2-b2df-b3c1654f0f7e" />
+# 基于做poc验证
+## 推导文档
 
+给定两条使用相同k的签名：
 
+第一条签名：
+
+text
+r1 = (e1 + x1) mod n
+s1 = (1 + d)^-1 * (k - r1*d) mod n
+第二条签名：
+
+text
+r2 = (e2 + x1) mod n  # 注意x1相同因为k相同
+s2 = (1 + d)^-1 * (k - r2*d) mod n
+由于k相同，我们可以建立方程组：
+
+从s1和s2的表达式可以得到：
+
+text
+s1*(1 + d) ≡ k - r1*d mod n
+s2*(1 + d) ≡ k - r2*d mod n
+将两式相减：
+
+text
+(s1 - s2)*(1 + d) ≡ (r2 - r1)*d mod n
+展开并整理：
+
+text
+(s1 - s2) + (s1 - s2)*d ≡ (r2 - r1)*d mod n
+将所有含d的项移到一边：
+
+text
+(s1 - s2) ≡ [(r2 - r1) - (s1 - s2)]*d mod n
+最终得到私钥d的表达式：
+
+text
+d ≡ (s1 - s2) * [(r2 - r1 - s1 + s2)^-1] mod n
+
+# 实验结果
 
